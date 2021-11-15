@@ -31,30 +31,27 @@ const searchBookByAuthor = async (book, searchPage = 1)=> {
   }
 };
 
-const extendFromOPDS = async (books)=> {
+const checkAddToDb = async (books)=> {
   const collection = context.services.get("mongodb-atlas").db("flibusta").collection("Books");
-  const extendedList = [];
+  const idOfBooks =  books.map(el=>el.bid);
+  const idOfBooksInDb = collection.find({bid: {$in: idOfBooks}}).toArray().map(el=>el.bid);
+  const booksNotInDb = books.filter(el=> !idOfBooksInDb.includes(el.bid));
 
-  for(let book of books){
-    let _book = await collection.findOne({bid: book.bid})
-    if(!_book){
-      _book = await searchBookByAuthor(book);
-      if(_book) collection.insert()
-
-    }
-
-    extendedList.push(_book || book);
+  for(let book of booksNotInDb){
+      const bookFromOPDS = await searchBookByAuthor(book);
+      if(bookFromOPDS) collection.insertOne(bookFromOPDS)
   }
-  return extendedList;
+
+  return  idOfBooks;
 }
 
 const getList  = async function(listId) {
   listId = "w";
+  const libraries = context.services.get("mongodb-atlas").db("flibusta").collection("Libraries");
   const text = await getText("http://flibusta.is/stat/"+listId);
   const list = await htmlParser(text);
-  const books = await extendFromOPDS(list);
-  console.log(books.length);
-  console.log("books", JSON.stringify(books[99]));
+  const booksId = checkAddToDb(list);
+  libraries.updateOne({_id:1},{$set:{["list-"+ listId]: booksId }})
 };
 
 
