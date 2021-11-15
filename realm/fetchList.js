@@ -34,8 +34,10 @@ const searchBookByAuthor = async (book, searchPage = 1)=> {
 const checkAddToDb = async (books)=> {
   const collection = context.services.get("mongodb-atlas").db("flibusta").collection("Books");
   const idOfBooks =  books.map(el=>el.bid);
-  const idOfBooksInDb = collection.find({bid: {$in: idOfBooks}}).toArray().map(el=>el.bid);
-  const booksNotInDb = books.filter(el=> !idOfBooksInDb.includes(el.bid));
+  const booksInDb = await collection.find({bid: {$in: idOfBooks}},{bid:1}).toArray();
+  const booksIDInDb= booksInDb.map(el=>el.bid);
+  const booksNotInDb = books.filter(el=> !booksIDInDb.includes(el.bid));
+  console.log("books Not In Db", JSON.stringify(booksNotInDb.map(el=> el.title)))
 
   for(let book of booksNotInDb){
       const bookFromOPDS = await searchBookByAuthor(book);
@@ -50,7 +52,7 @@ const getList  = async function(listId) {
   const libraries = context.services.get("mongodb-atlas").db("flibusta").collection("Libraries");
   const text = await getText("http://flibusta.is/stat/"+listId);
   const list = await htmlParser(text);
-  const booksId = checkAddToDb(list);
+  const booksId = await checkAddToDb(list);
   libraries.updateOne({_id:1},{$set:{["list-"+ listId]: booksId }})
 };
 
